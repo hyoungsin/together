@@ -1,0 +1,14 @@
+{
+  "builds": [
+    {
+      "src": "together_ui.py",
+      "use": "@vercel/python"
+    }
+  ],
+  "routes": [
+    {
+      "src": "/(.*)",
+      "dest": "together_ui.py"
+    }
+  ]
+} 
