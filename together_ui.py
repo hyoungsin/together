@@ -53,7 +53,7 @@ st.sidebar.markdown(f"*{model_descriptions[model_option]}*")
 def load_model(api_key, model_name):
     """AI 모델을 로드합니다."""
     try:
-        client = Together(api_key=api_key)
+        client = Together(api_key)
         return client
     except Exception as e:
         st.error(f"모델 로딩 오류: {e}")
