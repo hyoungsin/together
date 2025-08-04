@@ -6,7 +6,7 @@ import os
 # 페이지 설정
 st.set_page_config(
     page_title="🤖 Together AI 챗봇",
-    page_icon="🤖",
+    page_icon="",
     layout="wide"
 )
 
@@ -48,14 +48,13 @@ model_descriptions = {
 st.sidebar.markdown(f"**선택된 모델:** {model_option}")
 st.sidebar.markdown(f"*{model_descriptions[model_option]}*")
 
-# 모델 초기화 (세션 상태에 저장) - 수정된 부분
+# 모델 초기화 (세션 상태에 저장)
 @st.cache_resource
 def load_model(api_key, model_name):
     """AI 모델을 로드합니다."""
     try:
         # Together 라이브러리 올바른 초기화 방식
-        client = Together()
-        client.api_key = api_key
+        client = Together(api_key)
         return client
     except Exception as e:
         st.error(f"모델 로딩 오류: {e}")
@@ -89,23 +88,22 @@ if prompt := st.chat_input("질문을 입력하세요..."):
     with st.chat_message("user"):
         st.markdown(prompt)
 
-    # AI 응답 생성
+    # AI 응답 생성 - 수정된 부분
     with st.chat_message("assistant"):
         with st.spinner("🤔 AI가 생각하는 중..."):
             try:
-                response = client.chat.completions.create(
+                # Together 라이브러리 올바른 API 사용법
+                response = client.inference(
                     model=model_option,
-                    messages=[
-                        {
-                            "role": "user",
-                            "content": prompt
-                        }
-                    ],
+                    prompt=prompt,
                     max_tokens=1000,
-                    temperature=0.7
+                    temperature=0.7,
+                    top_p=0.7,
+                    top_k=50,
+                    repetition_penalty=1.1
                 )
                 
-                answer = response.choices[0].message.content
+                answer = response['output']['choices'][0]['text']
                 st.markdown(answer)
                 
                 # AI 메시지 추가
@@ -118,7 +116,7 @@ if prompt := st.chat_input("질문을 입력하세요..."):
 
 # 사이드바 - 추가 기능
 st.sidebar.markdown("---")
-st.sidebar.header("🛠️ 도구")
+st.sidebar.header("️ 도구")
 
 # 대화 초기화 버튼
 if st.sidebar.button("🗑️ 대화 초기화"):
@@ -150,8 +148,8 @@ st.sidebar.markdown(f"**대화 수:** {len(st.session_state.messages) // 2}")
 st.markdown("---")
 st.markdown("""
 <div style='text-align: center; color: #666;'>
-    <p>💡 <strong>팁:</strong> 질문을 구체적으로 하면 더 정확한 답변을 받을 수 있어요!</p>
-    <p>🔄 첫 응답은 시간이 걸릴 수 있어요. 기다려주세요!</p>
+    <p> <strong>팁:</strong> 질문을 구체적으로 하면 더 정확한 답변을 받을 수 있어요!</p>
+    <p> 첫 응답은 시간이 걸릴 수 있어요. 기다려주세요!</p>
     <p>🌐 <strong>한국어:</strong> exaone 모델, <strong>영어:</strong> llama 모델 추천</p>
 </div>
-""", unsafe_allow_html=True) 
+""", unsafe_allow_html=True)
