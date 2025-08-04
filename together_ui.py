@@ -54,8 +54,7 @@ def load_model(api_key, model_name):
     """AI 모델을 로드합니다."""
     try:
         # Together 라이브러리 올바른 초기화 방식
-        client = Together()
-        client.api_key = api_key
+        client = Together(api_key)
         return client
     except Exception as e:
         st.error(f"모델 로딩 오류: {e}")
@@ -94,17 +93,19 @@ if prompt := st.chat_input("질문을 입력하세요..."):
         with st.spinner("🤔 AI가 생각하는 중..."):
             try:
                 # Together 라이브러리 올바른 API 사용법
-                response = client.complete(
-                    prompt=prompt,
+                response = client.chat.completions.create(
                     model=model_option,
+                    messages=[
+                        {
+                            "role": "user",
+                            "content": prompt
+                        }
+                    ],
                     max_tokens=1000,
-                    temperature=0.7,
-                    top_p=0.7,
-                    top_k=50,
-                    repetition_penalty=1.1
+                    temperature=0.7
                 )
                 
-                answer = response['output']['choices'][0]['text']
+                answer = response.choices[0].message.content
                 st.markdown(answer)
                 
                 # AI 메시지 추가
