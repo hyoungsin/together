@@ -9,28 +9,13 @@ st.set_page_config(
     layout="wide"
 )
 
-# Together 라이브러리 동적 import 및 버전 확인
-@st.cache_resource
-def setup_together_client():
-    """Together 라이브러리를 안전하게 import하고 설정합니다."""
-    try:
-        # 동적 import로 버전 호환성 확인
-        import together
-        
-        # 버전 정보 표시
-        version = getattr(together, '__version__', 'Unknown')
-        st.sidebar.success(f"✅ Together 버전: {version}")
-        
-        return together
-    except ImportError as e:
-        st.error(f"❌ Together 라이브러리를 불러올 수 없습니다: {e}")
-        st.stop()
-    except Exception as e:
-        st.error(f"❌ 예상치 못한 오류: {e}")
-        st.stop()
-
-# Together 라이브러리 설정
-together_lib = setup_together_client()
+# Together 라이브러리 import
+try:
+    from together import Together
+    st.sidebar.success("✅ Together 라이브러리 로드 성공")
+except ImportError as e:
+    st.error(f"❌ Together 라이브러리를 설치해주세요: pip install together")
+    st.stop()
 
 # 제목과 설명
 st.title("🤖 Together AI 챗봇")
@@ -70,54 +55,29 @@ model_descriptions = {
 st.sidebar.markdown(f"**선택된 모델:** {model_option}")
 st.sidebar.markdown(f"*{model_descriptions[model_option]}*")
 
-# 안전한 클라이언트 초기화 함수
-def create_together_client(api_key):
-    """다양한 방식으로 Together 클라이언트 초기화를 시도합니다."""
-    if not api_key or len(api_key.strip()) == 0:
-        return None, "API 키가 입력되지 않았습니다."
+# Together 클라이언트 초기화 (간단한 방식)
+@st.cache_resource
+def init_together_client(api_key):
+    """Together 클라이언트를 초기화합니다."""
+    if not api_key:
+        return None
     
-    # 여러 방식으로 초기화 시도
-    initialization_methods = [
-        # 방법 1: 키워드 인자 방식 (최신)
-        lambda: together_lib.Together(api_key=api_key),
-        # 방법 2: 위치 인자 방식 (구버전 호환)
-        lambda: together_lib.Together(api_key),
-        # 방법 3: 환경변수 설정 후 초기화
-        lambda: _init_with_env_var(api_key),
-    ]
-    
-    for i, method in enumerate(initialization_methods, 1):
-        try:
-            st.sidebar.info(f"🔄 초기화 방법 {i} 시도 중...")
-            client = method()
-            st.sidebar.success(f"✅ 방법 {i}로 성공!")
-            return client, "성공"
-        except Exception as e:
-            st.sidebar.warning(f"⚠️ 방법 {i} 실패: {str(e)[:50]}...")
-            continue
-    
-    return None, "모든 초기화 방법이 실패했습니다."
-
-def _init_with_env_var(api_key):
-    """환경변수를 설정한 후 초기화하는 방법"""
-    os.environ['TOGETHER_API_KEY'] = api_key
-    return together_lib.Together()
+    try:
+        # API 키를 키워드 인자로 전달
+        client = Together(api_key=api_key)
+        return client
+    except Exception as e:
+        st.error(f"클라이언트 초기화 실패: {e}")
+        return None
 
 # 클라이언트 초기화
-client = None
 if api_key:
-    with st.spinner("🤖 AI 모델 초기화 중..."):
-        client, init_result = create_together_client(api_key)
-    
-    if client is None:
-        st.error(f"❌ {init_result}")
-        st.info("💡 **해결 방법:**")
-        st.info("1. API 키를 다시 확인해보세요")
-        st.info("2. 잠시 후 페이지를 새로고침해보세요")
-        st.info("3. Streamlit Cloud의 캐시를 초기화해보세요")
-        st.stop()
-    else:
+    client = init_together_client(api_key)
+    if client:
         st.success("✅ AI 모델이 성공적으로 로드되었습니다!")
+    else:
+        st.error("❌ API 키를 확인해주세요.")
+        st.stop()
 else:
     st.warning("⚠️ API 키를 입력해주세요.")
     st.stop()
@@ -142,32 +102,55 @@ if prompt := st.chat_input("질문을 입력하세요..."):
     with st.chat_message("assistant"):
         with st.spinner("🤔 AI가 생각하는 중..."):
             try:
-                # API 호출을 위한 메시지 구성
-                api_messages = [{"role": "user", "content": prompt}]
-                
-                # Together AI API 호출
-                response = client.chat.completions.create(
+                # Together API 호출 - 올바른 방법
+                response = client.completions.create(
                     model=model_option,
-                    messages=api_messages,
+                    prompt=prompt,
                     max_tokens=1000,
-                    temperature=0.7
+                    temperature=0.7,
+                    top_p=0.7,
+                    top_k=50,
+                    repetition_penalty=1.1,
+                    stop=["<|endoftext|>", "</s>"]
                 )
                 
-                answer = response.choices[0].message.content
-                st.markdown(answer)
+                # 응답 추출
+                if hasattr(response, 'choices') and response.choices:
+                    answer = response.choices[0].text.strip()
+                elif hasattr(response, 'text'):
+                    answer = response.text.strip()
+                else:
+                    answer = str(response).strip()
                 
-                # AI 메시지 추가
-                st.session_state.messages.append({"role": "assistant", "content": answer})
+                if answer:
+                    st.markdown(answer)
+                    st.session_state.messages.append({"role": "assistant", "content": answer})
+                else:
+                    st.error("❌ AI가 응답을 생성하지 못했습니다.")
                 
+            except AttributeError as e:
+                # chat.completions 방식도 시도
+                try:
+                    response = client.chat.completions.create(
+                        model=model_option,
+                        messages=[{"role": "user", "content": prompt}],
+                        max_tokens=1000,
+                        temperature=0.7
+                    )
+                    answer = response.choices[0].message.content.strip()
+                    st.markdown(answer)
+                    st.session_state.messages.append({"role": "assistant", "content": answer})
+                except Exception as e2:
+                    st.error(f"❌ API 호출 실패: {str(e2)}")
+                    
             except Exception as e:
-                error_msg = f"❌ 오류가 발생했습니다: {str(e)}"
-                st.error(error_msg)
+                st.error(f"❌ 오류가 발생했습니다: {str(e)}")
                 
                 # 디버깅 정보
                 with st.expander("🔍 디버그 정보"):
-                    st.code(f"오류 타입: {type(e).__name__}")
-                    st.code(f"오류 내용: {str(e)}")
-                    st.code(f"사용 모델: {model_option}")
+                    st.write("**에러 타입:**", type(e).__name__)
+                    st.write("**에러 메시지:**", str(e))
+                    st.write("**사용 모델:**", model_option)
 
 # 사이드바 - 추가 기능
 st.sidebar.markdown("---")
@@ -178,7 +161,7 @@ if st.sidebar.button("🗑️ 대화 초기화"):
     st.session_state.messages = []
     st.rerun()
 
-# 캐시 초기화 버튼 (Streamlit Cloud 문제 해결용)
+# 캐시 초기화 버튼
 if st.sidebar.button("🔄 캐시 초기화"):
     st.cache_resource.clear()
     st.rerun()
@@ -197,10 +180,9 @@ if st.sidebar.button("📥 대화 내보내기") and st.session_state.messages:
         mime="text/plain"
     )
 
-# 시스템 정보
+# 정보 표시
 st.sidebar.markdown("---")
-st.sidebar.markdown("### 📊 시스템 정보")
-st.sidebar.markdown(f"**Python 버전:** {st.__version__}")
+st.sidebar.markdown("### 📊 정보")
 st.sidebar.markdown(f"**현재 모델:** {model_option}")
 st.sidebar.markdown(f"**대화 수:** {len(st.session_state.messages) // 2}")
 
@@ -208,7 +190,7 @@ st.sidebar.markdown(f"**대화 수:** {len(st.session_state.messages) // 2}")
 st.markdown("---")
 st.markdown("""
 <div style='text-align: center; color: #666;'>
-    <p>💡 <strong>Streamlit Cloud 팁:</strong> 문제가 지속되면 캐시 초기화 버튼을 눌러보세요!</p>
+    <p>💡 <strong>팁:</strong> 질문을 구체적으로 하면 더 정확한 답변을 받을 수 있어요!</p>
     <p>🌐 <strong>한국어:</strong> exaone 모델, <strong>영어:</strong> llama 모델 추천</p>
 </div>
 """, unsafe_allow_html=True)
