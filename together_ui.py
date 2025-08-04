@@ -3,19 +3,20 @@ from together import Together
 import time
 import os
 
-# Together 라이브러리 버전 확인
-try:
-    import together
-    st.sidebar.markdown(f"**Together 버전:** {together.__version__}")
-except:
-    st.sidebar.markdown("**Together 버전:** 확인 불가")
-
-# 페이지 설정
+# 페이지 설정 - 수정된 부분
 st.set_page_config(
     page_title="🤖 Together AI 챗봇",
-    page_icon="",
+    page_icon="🤖",  # 빈 문자열 대신 이모지 사용
     layout="wide"
 )
+
+# Together 라이브러리 버전 확인 - 수정된 부분
+try:
+    import together
+    together_version = getattr(together, '__version__', 'Unknown')
+    st.sidebar.markdown(f"**Together 버전:** {together_version}")
+except Exception as e:
+    st.sidebar.markdown(f"**Together 버전:** 확인 불가 ({str(e)})")
 
 # 제목과 설명
 st.title("🤖 Together AI 챗봇")
