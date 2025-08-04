@@ -18,12 +18,12 @@ st.markdown("**Together AI와 자유롭게 대화해보세요!**")
 # 사이드바 - 설정
 st.sidebar.header("⚙️ 설정")
 
-# API 키 입력 (자동입력 제거)
+# API 키 입력
 api_key = st.sidebar.text_input(
     "🔑 Together AI API 키",
-    value="",  # 빈 값으로 설정
+    value="",
     type="password",
-    placeholder="sk-... 형태의 API 키를 입력하세요",
+    placeholder="Together AI API 키를 입력하세요",
     help="https://together.ai/ 에서 API 키를 발급받으세요"
 )
 
@@ -95,7 +95,7 @@ def call_together_api(api_key, model, messages, max_tokens=1000, temperature=0.7
     except Exception as e:
         return None, f"예상치 못한 오류: {str(e)}"
 
-# API 키 검증 및 안내
+# API 키 검증 및 안내 (수정된 부분)
 if not api_key:
     st.warning("⚠️ API 키를 입력해주세요.")
     
@@ -105,21 +105,21 @@ if not api_key:
         **Together AI API 키 발급받기:**
         
         1. 🌐 [Together AI 웹사이트](https://together.ai/) 방문
-        2. 🔐 계정 생성 또는 로그인
-        3. ⚙️ API 키 섹션으로 이동
+        2. 🔐 계정 생성 또는 로그인  
+        3. ⚙️ Dashboard → API Keys 섹션으로 이동
         4. ➕ 새 API 키 생성
         5. 📋 생성된 키를 복사해서 왼쪽에 입력
         
         **주의사항:**
-        - API 키는 `sk-`로 시작해요
+        - Together AI API 키는 긴 문자열 형태예요
         - 키를 잃어버리면 재발급 받아야 해요
         - 절대 다른 사람과 공유하지 마세요! 🚫
         """)
     st.stop()
 
-# API 키 형식 검증
-elif not api_key.startswith('sk-') or len(api_key) < 20:
-    st.error("❌ API 키 형식이 올바르지 않습니다. 'sk-'로 시작하는 키를 입력해주세요.")
+# 간단한 길이 검증만 수행 (형태 검증 제거)
+elif len(api_key.strip()) < 10:
+    st.error("❌ API 키가 너무 짧습니다. 올바른 Together AI API 키를 입력해주세요.")
     st.stop()
 else:
     st.success("✅ API 키가 입력되었습니다!")
