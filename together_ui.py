@@ -48,7 +48,7 @@ model_descriptions = {
 st.sidebar.markdown(f"**선택된 모델:** {model_option}")
 st.sidebar.markdown(f"*{model_descriptions[model_option]}*")
 
-# 모델 초기화 (세션 상태에 저장) - 수정된 부분
+# 모델 초기화 (세션 상태에 저장)
 @st.cache_resource
 def load_model(api_key, model_name):
     """AI 모델을 로드합니다."""
@@ -94,7 +94,7 @@ if prompt := st.chat_input("질문을 입력하세요..."):
         with st.spinner("🤔 AI가 생각하는 중..."):
             try:
                 # Together 라이브러리 올바른 API 사용법
-                response = client.inference(
+                response = client.complete(
                     model=model_option,
                     prompt=prompt,
                     max_tokens=1000,
