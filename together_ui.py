@@ -95,8 +95,8 @@ if prompt := st.chat_input("질문을 입력하세요..."):
             try:
                 # Together 라이브러리 올바른 API 사용법
                 response = client.complete(
-                    model=model_option,
                     prompt=prompt,
+                    model=model_option,
                     max_tokens=1000,
                     temperature=0.7,
                     top_p=0.7,
