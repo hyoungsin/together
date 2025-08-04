@@ -3,6 +3,13 @@ from together import Together
 import time
 import os
 
+# Together 라이브러리 버전 확인
+try:
+    import together
+    st.sidebar.markdown(f"**Together 버전:** {together.__version__}")
+except:
+    st.sidebar.markdown("**Together 버전:** 확인 불가")
+
 # 페이지 설정
 st.set_page_config(
     page_title="🤖 Together AI 챗봇",
@@ -48,13 +55,25 @@ model_descriptions = {
 st.sidebar.markdown(f"**선택된 모델:** {model_option}")
 st.sidebar.markdown(f"*{model_descriptions[model_option]}*")
 
-# 모델 초기화 (세션 상태에 저장)
+# 모델 초기화 (세션 상태에 저장) - 안전한 초기화 방식
 @st.cache_resource
 def load_model(api_key, model_name):
     """AI 모델을 로드합니다."""
     try:
-        # Together 라이브러리 올바른 초기화 방식
-        client = Together(api_key)
+        # 여러 초기화 방식 시도
+        try:
+            # 방식 1: 매개변수로 전달
+            client = Together(api_key)
+        except TypeError:
+            try:
+                # 방식 2: 빈 생성자 후 설정
+                client = Together()
+                client.api_key = api_key
+            except:
+                # 방식 3: 환경변수 설정
+                os.environ["TOGETHER_API_KEY"] = api_key
+                client = Together()
+        
         return client
     except Exception as e:
         st.error(f"모델 로딩 오류: {e}")
@@ -88,24 +107,48 @@ if prompt := st.chat_input("질문을 입력하세요..."):
     with st.chat_message("user"):
         st.markdown(prompt)
 
-    # AI 응답 생성 - 수정된 부분
+    # AI 응답 생성 - 안전한 API 호출 방식
     with st.chat_message("assistant"):
         with st.spinner("🤔 AI가 생각하는 중..."):
             try:
-                # Together 라이브러리 올바른 API 사용법
-                response = client.chat.completions.create(
-                    model=model_option,
-                    messages=[
-                        {
-                            "role": "user",
-                            "content": prompt
-                        }
-                    ],
-                    max_tokens=1000,
-                    temperature=0.7
-                )
+                # 여러 API 호출 방식 시도
+                try:
+                    # 방식 1: chat.completions.create
+                    response = client.chat.completions.create(
+                        model=model_option,
+                        messages=[
+                            {
+                                "role": "user",
+                                "content": prompt
+                            }
+                        ],
+                        max_tokens=1000,
+                        temperature=0.7
+                    )
+                    answer = response.choices[0].message.content
+                except AttributeError:
+                    try:
+                        # 방식 2: complete
+                        response = client.complete(
+                            prompt=prompt,
+                            model=model_option,
+                            max_tokens=1000,
+                            temperature=0.7,
+                            top_p=0.7,
+                            top_k=50,
+                            repetition_penalty=1.1
+                        )
+                        answer = response['output']['choices'][0]['text']
+                    except:
+                        # 방식 3: inference
+                        response = client.inference(
+                            model=model_option,
+                            prompt=prompt,
+                            max_tokens=1000,
+                            temperature=0.7
+                        )
+                        answer = response['output']['choices'][0]['text']
                 
-                answer = response.choices[0].message.content
                 st.markdown(answer)
                 
                 # AI 메시지 추가
