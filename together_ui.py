@@ -48,12 +48,14 @@ model_descriptions = {
 st.sidebar.markdown(f"**선택된 모델:** {model_option}")
 st.sidebar.markdown(f"*{model_descriptions[model_option]}*")
 
-# 모델 초기화 (세션 상태에 저장)
+# 모델 초기화 (세션 상태에 저장) - 수정된 부분
 @st.cache_resource
 def load_model(api_key, model_name):
     """AI 모델을 로드합니다."""
     try:
-        client = Together(api_key)
+        # Together 라이브러리 올바른 초기화 방식
+        client = Together()
+        client.api_key = api_key
         return client
     except Exception as e:
         st.error(f"모델 로딩 오류: {e}")
