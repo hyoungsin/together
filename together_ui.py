@@ -1,4 +1,5 @@
 import streamlit as st
+from together import Together
 import time
 import os
 
@@ -9,13 +10,12 @@ st.set_page_config(
     layout="wide"
 )
 
-# Together 라이브러리 import
+# Together 라이브러리 로드 확인
 try:
-    from together import Together
+    import together
     st.sidebar.success("✅ Together 라이브러리 로드 성공")
-except ImportError as e:
-    st.error(f"❌ Together 라이브러리를 설치해주세요: pip install together")
-    st.stop()
+except Exception as e:
+    st.sidebar.error(f"❌ Together 라이브러리 로드 실패: {e}")
 
 # 제목과 설명
 st.title("🤖 Together AI 챗봇")
@@ -25,7 +25,7 @@ st.markdown("**Together AI와 자유롭게 대화해보세요!**")
 # 사이드바 - 설정
 st.sidebar.header("⚙️ 설정")
 
-# API 키 입력
+# API 키 입력 (환경변수에서 먼저 확인)
 default_api_key = os.getenv("TOGETHER_API_KEY", "")
 api_key = st.sidebar.text_input(
     "🔑 Together AI API 키",
@@ -55,27 +55,25 @@ model_descriptions = {
 st.sidebar.markdown(f"**선택된 모델:** {model_option}")
 st.sidebar.markdown(f"*{model_descriptions[model_option]}*")
 
-# Together 클라이언트 초기화 (간단한 방식)
+# 모델 초기화 (세션 상태에 저장) - 수정된 부분
 @st.cache_resource
-def init_together_client(api_key):
-    """Together 클라이언트를 초기화합니다."""
-    if not api_key:
-        return None
-    
+def load_model(api_key, model_name):
+    """AI 모델을 로드합니다."""
     try:
-        # API 키를 키워드 인자로 전달
-        client = Together(api_key=api_key)
+        # Together 라이브러리 올바른 초기화 방식
+        client = Together()
+        client.api_key = api_key
         return client
     except Exception as e:
         st.error(f"클라이언트 초기화 실패: {e}")
         return None
 
-# 클라이언트 초기화
+# API 키가 입력되었을 때만 모델 로드
 if api_key:
-    client = init_together_client(api_key)
-    if client:
-        st.success("✅ AI 모델이 성공적으로 로드되었습니다!")
-    else:
+    with st.spinner("🤖 AI 모델을 불러오는 중..."):
+        client = load_model(api_key, model_option)
+    
+    if client is None:
         st.error("❌ API 키를 확인해주세요.")
         st.stop()
 else:
@@ -102,55 +100,29 @@ if prompt := st.chat_input("질문을 입력하세요..."):
     with st.chat_message("assistant"):
         with st.spinner("🤔 AI가 생각하는 중..."):
             try:
-                # Together API 호출 - 올바른 방법
-                response = client.completions.create(
+                # Together 라이브러리 올바른 API 사용법
+                response = client.chat.completions.create(
                     model=model_option,
-                    prompt=prompt,
+                    messages=[
+                        {
+                            "role": "user",
+                            "content": prompt
+                        }
+                    ],
                     max_tokens=1000,
-                    temperature=0.7,
-                    top_p=0.7,
-                    top_k=50,
-                    repetition_penalty=1.1,
-                    stop=["<|endoftext|>", "</s>"]
+                    temperature=0.7
                 )
                 
-                # 응답 추출
-                if hasattr(response, 'choices') and response.choices:
-                    answer = response.choices[0].text.strip()
-                elif hasattr(response, 'text'):
-                    answer = response.text.strip()
-                else:
-                    answer = str(response).strip()
+                answer = response.choices[0].message.content
+                st.markdown(answer)
                 
-                if answer:
-                    st.markdown(answer)
-                    st.session_state.messages.append({"role": "assistant", "content": answer})
-                else:
-                    st.error("❌ AI가 응답을 생성하지 못했습니다.")
+                # AI 메시지 추가
+                st.session_state.messages.append({"role": "assistant", "content": answer})
                 
-            except AttributeError as e:
-                # chat.completions 방식도 시도
-                try:
-                    response = client.chat.completions.create(
-                        model=model_option,
-                        messages=[{"role": "user", "content": prompt}],
-                        max_tokens=1000,
-                        temperature=0.7
-                    )
-                    answer = response.choices[0].message.content.strip()
-                    st.markdown(answer)
-                    st.session_state.messages.append({"role": "assistant", "content": answer})
-                except Exception as e2:
-                    st.error(f"❌ API 호출 실패: {str(e2)}")
-                    
             except Exception as e:
-                st.error(f"❌ 오류가 발생했습니다: {str(e)}")
-                
-                # 디버깅 정보
-                with st.expander("🔍 디버그 정보"):
-                    st.write("**에러 타입:**", type(e).__name__)
-                    st.write("**에러 메시지:**", str(e))
-                    st.write("**사용 모델:**", model_option)
+                error_msg = f"❌ 오류가 발생했습니다: {e}"
+                st.error(error_msg)
+                st.session_state.messages.append({"role": "assistant", "content": error_msg})
 
 # 사이드바 - 추가 기능
 st.sidebar.markdown("---")
@@ -161,24 +133,20 @@ if st.sidebar.button("🗑️ 대화 초기화"):
     st.session_state.messages = []
     st.rerun()
 
-# 캐시 초기화 버튼
-if st.sidebar.button("🔄 캐시 초기화"):
-    st.cache_resource.clear()
-    st.rerun()
-
 # 대화 내보내기
-if st.sidebar.button("📥 대화 내보내기") and st.session_state.messages:
-    chat_text = ""
-    for msg in st.session_state.messages:
-        role = "사용자" if msg["role"] == "user" else "AI"
-        chat_text += f"**{role}:** {msg['content']}\n\n"
-    
-    st.sidebar.download_button(
-        label="💾 대화 저장",
-        data=chat_text,
-        file_name=f"together_chat_{time.strftime('%Y%m%d_%H%M%S')}.txt",
-        mime="text/plain"
-    )
+if st.sidebar.button("📥 대화 내보내기"):
+    if st.session_state.messages:
+        chat_text = ""
+        for msg in st.session_state.messages:
+            role = "사용자" if msg["role"] == "user" else "AI"
+            chat_text += f"**{role}:** {msg['content']}\n\n"
+        
+        st.sidebar.download_button(
+            label="💾 대화 저장",
+            data=chat_text,
+            file_name=f"together_chat_{time.strftime('%Y%m%d_%H%M%S')}.txt",
+            mime="text/plain"
+        )
 
 # 정보 표시
 st.sidebar.markdown("---")
