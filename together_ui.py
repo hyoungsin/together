@@ -5,15 +5,15 @@ import time
 
 # 페이지 설정
 st.set_page_config(
-    page_title="🤖 Together AI 챗봇",
+    page_title="🤖 Jambro Chatbot",
     page_icon="🤖",
     layout="wide"
 )
 
 # 제목과 설명
-st.title("🤖 Together AI 챗봇")
+st.title("🤖 Jambro Chatbot")
 st.markdown("---")
-st.markdown("**Together AI와 자유롭게 대화해보세요!**")
+st.markdown("**Jambro와 자유롭게 대화해보세요!**")
 
 # 사이드바 - 설정
 st.sidebar.header("⚙️ 설정")
